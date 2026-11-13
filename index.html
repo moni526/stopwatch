@@ -1,0 +1,599 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>말랑 에그 타이머</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fff8ec;
+    --dot: #ffe9c7;
+    --card: #ffffff;
+    --ink: #5b3a29;
+    --muted: #b08968;
+    --line: #f3dfc1;
+    --yolk: #ffc93c;
+    --yolk-deep: #ff9f1c;
+    --sel: #fff4d6;
+    --pink: #ff8fa3;
+    --water: #bfe6f5;
+    --water-deep: #93d1ea;
+    --steam: #e7d8c6;
+    --ring-track: #f6e6cc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #2a1f1a;
+      --dot: #33261f;
+      --card: #3a2c24;
+      --ink: #ffebd2;
+      --muted: #c9a27e;
+      --line: #4d3a2e;
+      --sel: #4a3622;
+      --water: #4f8aa3;
+      --water-deep: #3a6f88;
+      --steam: #6e5a4c;
+      --ring-track: #46362b;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    min-height: 100vh;
+    background-color: var(--bg);
+    background-image: radial-gradient(var(--dot) 1.6px, transparent 1.8px);
+    background-size: 22px 22px;
+    color: var(--ink);
+    font-family: "Jua", ui-rounded, "Apple SD Gothic Neo", sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 24px 16px 40px;
+  }
+  .wrap { width: 100%; max-width: 520px; }
+
+  /* ---------- header ---------- */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand svg { width: 34px; height: 34px; }
+  h1 { font-size: 26px; font-weight: 400; margin: 0; }
+  .sound {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    border: 2px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    display: grid; place-items: center;
+    cursor: pointer;
+    box-shadow: 0 3px 0 var(--line);
+  }
+  .sound:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line); }
+  .sound svg { width: 22px; height: 22px; }
+  .sound .off { display: none; }
+  .sound[aria-pressed="false"] .on { display: none; }
+  .sound[aria-pressed="false"] .off { display: inline; }
+
+  /* ---------- stage ---------- */
+  .stage {
+    display: block;
+    width: min(260px, 74vw);
+    margin: 4px auto 0;
+    overflow: visible;
+  }
+  .ring { transition: stroke-dashoffset .25s linear; }
+  .stage[data-state="done"] .ring { animation: glow 1.4s ease-in-out infinite; }
+  @keyframes glow { 50% { stroke-width: 18; } }
+
+  .wave-back  { animation: wave 6s linear infinite; }
+  .wave-front { animation: wave 4s linear infinite reverse; }
+  .stage.boiling .wave-back  { animation-duration: 2.4s; }
+  .stage.boiling .wave-front { animation-duration: 1.6s; }
+  @keyframes wave { from { transform: translateX(0); } to { transform: translateX(-150px); } }
+
+  .bubble { opacity: 0; }
+  .stage.boiling .bubble { animation: rise 1.8s ease-in infinite; }
+  @keyframes rise {
+    0%   { transform: translateY(0);     opacity: 0; }
+    20%  { opacity: .9; }
+    100% { transform: translateY(-70px); opacity: 0; }
+  }
+
+  .steam { opacity: 0; }
+  .stage.boiling .steam { animation: steam 2.2s ease-out infinite; }
+  @keyframes steam {
+    0%   { transform: translateY(8px);  opacity: 0; }
+    40%  { opacity: .9; }
+    100% { transform: translateY(-14px); opacity: 0; }
+  }
+
+  .egg-bob { transform-box: fill-box; transform-origin: 50% 95%; }
+  .stage.boiling .egg-bob { animation: wobble 1.1s ease-in-out infinite; }
+  .stage[data-state="done"] .egg-bob { animation: hop .9s ease-in-out infinite; }
+  @keyframes wobble { 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+  @keyframes hop {
+    0%, 100% { transform: translateY(0) scale(1, 1); }
+    15% { transform: translateY(0) scale(1.06, .94); }
+    45% { transform: translateY(-14px) scale(.97, 1.03); }
+  }
+
+  /* face states */
+  .eyes-sleep, .eyes-happy, .mouth-happy, .zzz, .sweat, .sparkles { display: none; }
+  .stage[data-state="idle"] .eyes-open { display: none; }
+  .stage[data-state="idle"] .eyes-sleep,
+  .stage[data-state="idle"] .zzz { display: inline; }
+  .stage[data-state="running"] .sweat { display: inline; }
+  .stage[data-state="done"] .eyes-open,
+  .stage[data-state="done"] .mouth-default { display: none; }
+  .stage[data-state="done"] .eyes-happy,
+  .stage[data-state="done"] .mouth-happy,
+  .stage[data-state="done"] .sparkles { display: inline; }
+
+  .zzz text { animation: float 2.4s ease-in-out infinite; }
+  .zzz text:nth-child(2) { animation-delay: .6s; }
+  @keyframes float { 50% { transform: translateY(-5px); opacity: .5; } }
+
+  .sweat { animation: drip 1.6s ease-in infinite; }
+  @keyframes drip { 0% { transform: translateY(-3px); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(8px); opacity: 0; } }
+
+  .sparkles path { transform-box: fill-box; transform-origin: center; animation: twinkle 1s ease-in-out infinite; }
+  .sparkles path:nth-child(2) { animation-delay: .25s; }
+  .sparkles path:nth-child(3) { animation-delay: .5s; }
+  .sparkles path:nth-child(4) { animation-delay: .75s; }
+  @keyframes twinkle { 0%, 100% { transform: scale(.4) rotate(0); opacity: .4; } 50% { transform: scale(1.1) rotate(20deg); opacity: 1; } }
+
+  /* ---------- time ---------- */
+  .time {
+    text-align: center;
+    font-family: ui-rounded, "SF Pro Rounded", "Jua", system-ui, sans-serif;
+    font-variant-numeric: tabular-nums;
+    font-size: clamp(52px, 15vw, 68px);
+    font-weight: 700;
+    line-height: 1;
+    margin-top: 6px;
+    letter-spacing: -1px;
+  }
+  .time .cs { font-size: .5em; color: var(--muted); }
+  .status {
+    display: table;
+    margin: 10px auto 0;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: var(--card);
+    border: 2px solid var(--line);
+    font-size: 15px;
+    color: var(--muted);
+  }
+  .stage-wrap[data-state="done"] .status { background: var(--pink); border-color: var(--pink); color: #fff; }
+
+  .bubble-msg {
+    position: relative;
+    margin: 18px auto 20px;
+    max-width: 400px;
+    min-height: 48px;
+    padding: 12px 16px;
+    background: var(--card);
+    border: 2px solid var(--line);
+    border-radius: 18px;
+    text-align: center;
+    font-size: 16px;
+    line-height: 1.4;
+  }
+  .bubble-msg::before {
+    content: "";
+    position: absolute;
+    top: -9px; left: 50%;
+    width: 14px; height: 14px;
+    background: var(--card);
+    border-left: 2px solid var(--line);
+    border-top: 2px solid var(--line);
+    transform: translateX(-50%) rotate(45deg);
+  }
+
+  /* ---------- levels ---------- */
+  .levels {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+  }
+  .level {
+    flex: 0 0 calc((100% - 40px) / 5);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 10px 4px 10px;
+    border-radius: 20px;
+    border: 2px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    font-family: inherit;
+    cursor: pointer;
+    box-shadow: 0 4px 0 var(--line);
+    transition: transform .1s, box-shadow .1s, background .15s, border-color .15s;
+  }
+  .level:hover { transform: translateY(-2px); box-shadow: 0 6px 0 var(--line); }
+  .level:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--line); }
+  .level svg { width: 44px; height: 46px; margin-bottom: 2px; }
+  .level strong { font-weight: 400; font-size: 14px; white-space: nowrap; }
+  .level span { font-size: 13px; color: var(--muted); }
+  .level[aria-pressed="true"] {
+    background: var(--sel);
+    border-color: var(--yolk-deep);
+    box-shadow: 0 4px 0 var(--yolk-deep);
+  }
+  .level[aria-pressed="true"] svg { animation: hop .9s ease-in-out infinite; }
+  .level:focus-visible, .ctrl:focus-visible, .sound:focus-visible { outline: 3px solid var(--yolk-deep); outline-offset: 3px; }
+
+  @media (max-width: 500px) {
+    .level { flex-basis: calc((100% - 20px) / 3); }
+  }
+
+  /* ---------- controls ---------- */
+  .controls { display: flex; gap: 12px; margin-top: 22px; }
+  .ctrl {
+    flex: 1;
+    height: 54px;
+    border-radius: 999px;
+    border: 2px solid var(--line);
+    background: var(--card);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: 0 4px 0 var(--line);
+    transition: transform .1s, box-shadow .1s, opacity .15s;
+  }
+  .ctrl.primary { background: var(--yolk); border-color: var(--yolk-deep); box-shadow: 0 4px 0 var(--yolk-deep); color: #5b3a29; }
+  .ctrl:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 var(--line); }
+  .ctrl.primary:active:not(:disabled) { box-shadow: 0 1px 0 var(--yolk-deep); }
+  .ctrl:disabled { opacity: .45; cursor: default; }
+
+  .hint { text-align: center; color: var(--muted); font-size: 13px; margin-top: 22px; line-height: 1.7; }
+  kbd {
+    font-family: inherit;
+    background: var(--card);
+    border: 1.5px solid var(--line);
+    border-radius: 6px;
+    padding: 0 6px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 100 110" aria-hidden="true">
+        <path d="M50 6C24 6 10 44 10 66c0 24 18 38 40 38s40-14 40-38C90 44 76 6 50 6Z" fill="#fff3dc" stroke="#f0d9b5" stroke-width="5"/>
+        <circle cx="38" cy="66" r="5" fill="#5b3a29"/><circle cx="62" cy="66" r="5" fill="#5b3a29"/>
+        <ellipse cx="28" cy="77" rx="7" ry="4" fill="#ffb4b4"/><ellipse cx="72" cy="77" rx="7" ry="4" fill="#ffb4b4"/>
+      </svg>
+      <h1>말랑 에그 타이머</h1>
+    </div>
+    <button class="sound" id="sound" aria-pressed="true" aria-label="알림음 켜기/끄기" title="알림음">
+      <svg class="on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      <svg class="off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><path d="m2 2 20 20"/></svg>
+    </button>
+  </header>
+
+  <div class="stage-wrap" id="stageWrap" data-state="idle">
+    <svg class="stage" id="stage" data-state="idle" viewBox="0 0 300 300" aria-hidden="true">
+      <defs>
+        <clipPath id="pot"><circle cx="150" cy="150" r="116"/></clipPath>
+        <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#ffd84d"/>
+          <stop offset="1" stop-color="#ff9f1c"/>
+        </linearGradient>
+      </defs>
+
+      <circle cx="150" cy="150" r="130" fill="none" stroke="var(--ring-track)" stroke-width="14"/>
+      <circle class="ring" id="ring" cx="150" cy="150" r="130" fill="none" stroke="url(#ringGrad)"
+              stroke-width="14" stroke-linecap="round" transform="rotate(-90 150 150)"
+              stroke-dasharray="816.81" stroke-dashoffset="816.81"/>
+      <circle cx="150" cy="150" r="116" fill="var(--card)"/>
+
+      <g clip-path="url(#pot)">
+        <!-- steam -->
+        <g stroke="var(--steam)" stroke-width="5" stroke-linecap="round" fill="none">
+          <path class="steam" d="M122 112q-7-10 0-20t0-20"/>
+          <path class="steam" d="M150 104q-7-10 0-20t0-20" style="animation-delay:.7s"/>
+          <path class="steam" d="M178 112q-7-10 0-20t0-20" style="animation-delay:1.4s"/>
+        </g>
+
+        <!-- egg character -->
+        <g transform="translate(102 118) scale(0.96)">
+          <g class="egg-bob">
+            <path d="M50 6C24 6 10 44 10 66c0 24 18 38 40 38s40-14 40-38C90 44 76 6 50 6Z" fill="#fff3dc" stroke="#f0d9b5" stroke-width="3"/>
+            <ellipse cx="34" cy="34" rx="7" ry="11" fill="#fff" opacity=".8" transform="rotate(20 34 34)"/>
+            <ellipse cx="27" cy="76" rx="7" ry="4" fill="#ffb4b4"/>
+            <ellipse cx="73" cy="76" rx="7" ry="4" fill="#ffb4b4"/>
+            <g class="eyes-open" fill="#5b3a29">
+              <circle cx="38" cy="64" r="4.5"/><circle cx="62" cy="64" r="4.5"/>
+              <circle cx="39.5" cy="62.5" r="1.4" fill="#fff"/><circle cx="63.5" cy="62.5" r="1.4" fill="#fff"/>
+            </g>
+            <g class="eyes-sleep" stroke="#5b3a29" stroke-width="3" stroke-linecap="round" fill="none">
+              <path d="M33 64q5 4 10 0"/><path d="M57 64q5 4 10 0"/>
+            </g>
+            <g class="eyes-happy" stroke="#5b3a29" stroke-width="3" stroke-linecap="round" fill="none">
+              <path d="M33 66q5-8 10 0"/><path d="M57 66q5-8 10 0"/>
+            </g>
+            <path class="mouth-default" d="M45 75q5 5 10 0" stroke="#5b3a29" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+            <path class="mouth-happy" d="M43 73q7 12 14 0Z" fill="#e76f51" stroke="#5b3a29" stroke-width="2" stroke-linejoin="round"/>
+            <path class="sweat" d="M86 38q-5 8 0 11q5-3 0-11Z" fill="#9ad3f0"/>
+          </g>
+        </g>
+
+        <!-- water -->
+        <g class="wave-back" fill="var(--water-deep)">
+          <path d="M0 208q37.5-10 75 0t75 0t75 0t75 0t75 0t75 0V300H0Z"/>
+        </g>
+        <g class="bubbles" fill="#fff">
+          <circle class="bubble" cx="118" cy="282" r="4"/>
+          <circle class="bubble" cx="140" cy="290" r="3" style="animation-delay:.5s"/>
+          <circle class="bubble" cx="164" cy="284" r="5" style="animation-delay:1s"/>
+          <circle class="bubble" cx="186" cy="288" r="3" style="animation-delay:.3s"/>
+          <circle class="bubble" cx="100" cy="292" r="3" style="animation-delay:1.3s"/>
+          <circle class="bubble" cx="200" cy="280" r="4" style="animation-delay:.8s"/>
+        </g>
+        <g class="wave-front" fill="var(--water)" opacity=".85">
+          <path d="M-150 204q37.5 10 75 0t75 0t75 0t75 0t75 0t75 0t75 0t75 0V300H-150Z"/>
+        </g>
+      </g>
+
+      <g class="zzz" fill="var(--muted)" font-family="Jua, sans-serif">
+        <text x="190" y="120" font-size="16">z</text>
+        <text x="202" y="102" font-size="22">Z</text>
+      </g>
+      <g class="sparkles" fill="#ffc93c">
+        <path d="M92 118l3 7 7 3-7 3-3 7-3-7-7-3 7-3Z"/>
+        <path d="M208 106l3 7 7 3-7 3-3 7-3-7-7-3 7-3Z" fill="#ff8fa3"/>
+        <path d="M84 168l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z" fill="#ff8fa3"/>
+        <path d="M216 162l2 5 5 2-5 2-2 5-2-5-5-2 5-2Z"/>
+      </g>
+    </svg>
+
+    <div class="time" id="time">00:00<span class="cs">.00</span></div>
+    <div class="status" id="status">익힘 정도를 골라주세요</div>
+  </div>
+
+  <div class="bubble-msg" id="msg" aria-live="polite"></div>
+
+  <div class="levels" id="levels"></div>
+
+  <div class="controls">
+    <button class="ctrl primary" id="pause" disabled>멈춤</button>
+    <button class="ctrl" id="reset" disabled>처음부터</button>
+  </div>
+
+  <p class="hint">
+    물이 끓기 시작하면 계란을 넣고 버튼을 눌러주세요 · 냉장 계란은 +1분<br>
+    <kbd>1</kbd>~<kbd>5</kbd> 익힘 선택 · <kbd>Space</kbd> 멈춤/계속 · <kbd>R</kbd> 처음부터
+  </p>
+</div>
+
+<script>
+  const LEVELS = [
+    { name: '흐르는 반숙',   min: 6,  yolk: '#ff961a', r: 13,   drip: true, gloss: true, desc: '노른자가 주르륵 흘러요' },
+    { name: '촉촉 반숙',     min: 7,  yolk: '#ffa726', r: 13,   gloss: true,             desc: '라면이랑 찰떡이에요' },
+    { name: '쫀득 반숙',     min: 8,  yolk: '#ffbb3d', r: 13.5,                           desc: '꾸덕꾸덕 젤리 노른자' },
+    { name: '부드러운 완숙', min: 10, yolk: '#ffd25e', r: 14,                             desc: '샐러드에 딱 좋아요' },
+    { name: '완전 완숙',     min: 12, yolk: '#f3dc7c', r: 14,   rim: '#c8c48c',          desc: '퍽퍽하고 고소하게' },
+  ];
+
+  const $ = id => document.getElementById(id);
+  const stage = $('stage'), stageWrap = $('stageWrap'), ring = $('ring');
+  const timeEl = $('time'), statusEl = $('status'), msgEl = $('msg');
+  const pauseBtn = $('pause'), resetBtn = $('reset'), soundBtn = $('sound');
+  const CIRC = 2 * Math.PI * 130;
+
+  // ---------- level buttons ----------
+  function eggIcon(l) {
+    const drip = l.drip ? `<path d="M36 44c2 6 1 12-2 14-3-2-3-8 0-13Z" fill="${l.yolk}"/>` : '';
+    const gloss = l.gloss ? `<ellipse cx="25" cy="34" rx="4" ry="2.6" fill="#fff" opacity=".75" transform="rotate(-30 25 34)"/>` : '';
+    const rim = l.rim ? `stroke="${l.rim}" stroke-width="2"` : '';
+    return `<svg viewBox="0 0 60 64" aria-hidden="true">
+      <path d="M30 4C15 4 6 26 6 40c0 14 11 22 24 22s24-8 24-22C54 26 45 4 30 4Z" fill="#fffdf8" stroke="#f0d9b5" stroke-width="2.5"/>
+      <circle cx="30" cy="39" r="${l.r}" fill="${l.yolk}" ${rim}/>
+      ${drip}${gloss}
+    </svg>`;
+  }
+  const levelBtns = LEVELS.map((l, i) => {
+    const b = document.createElement('button');
+    b.className = 'level';
+    b.setAttribute('aria-pressed', 'false');
+    b.innerHTML = `${eggIcon(l)}<strong>${l.name}</strong><span>${l.min}분</span>`;
+    b.addEventListener('click', () => selectLevel(i));
+    $('levels').appendChild(b);
+    return b;
+  });
+
+  // ---------- timer state ----------
+  let selected = null;   // index into LEVELS, null = idle
+  let running = false;
+  let startTime = 0;     // performance.now() at last (re)start
+  let elapsed = 0;       // ms accumulated before last (re)start
+  let doneFired = false;
+  let flashText = null, flashTimer = null;
+
+  const now = () => elapsed + (running ? performance.now() - startTime : 0);
+  const target = () => LEVELS[selected].min * 60000;
+
+  function selectLevel(i) {
+    unlockAudio();
+    pop();
+    if (selected === null) {
+      elapsed = 0;
+      doneFired = false;
+      flash(null);
+    } else if (selected !== i) {
+      // Eggs are already in the water: keep the elapsed time, just move the goal.
+      flash(`목표를 ${LEVELS[i].name}(${LEVELS[i].min}분)으로 바꿨어요`);
+    }
+    selected = i;
+    if (now() < target()) doneFired = false;
+    if (!running) { startTime = performance.now(); running = true; }
+    levelBtns.forEach((b, j) => b.setAttribute('aria-pressed', String(j === i)));
+    update();
+  }
+
+  function togglePause() {
+    if (selected === null) return;
+    unlockAudio();
+    if (running) { elapsed = now(); running = false; }
+    else { startTime = performance.now(); running = true; }
+    update();
+  }
+
+  function reset() {
+    if (selected === null) return;
+    selected = null;
+    running = false;
+    elapsed = 0;
+    doneFired = false;
+    flash(null);
+    levelBtns.forEach(b => b.setAttribute('aria-pressed', 'false'));
+    update();
+  }
+
+  function flash(text) {
+    clearTimeout(flashTimer);
+    flashText = text;
+    if (text) flashTimer = setTimeout(() => { flashText = null; update(); }, 2600);
+  }
+
+  // ---------- rendering ----------
+  const pad = n => String(n).padStart(2, '0');
+  const mmss = s => `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
+  const setText = (el, t) => { if (el.textContent !== t) el.textContent = t; };
+  const setHTML = (el, h) => { if (el.innerHTML !== h) el.innerHTML = h; };
+
+  function update() {
+    const t = now();
+    const l = selected === null ? null : LEVELS[selected];
+    const done = l && t >= target();
+
+    if (done && !doneFired) { doneFired = true; onDone(); }
+
+    const state = !l ? 'idle' : done ? 'done' : running ? 'running' : 'paused';
+    if (stage.dataset.state !== state) { stage.dataset.state = state; stageWrap.dataset.state = state; }
+    stage.classList.toggle('boiling', running && !done);
+
+    // ring
+    const p = l ? Math.min(t / target(), 1) : 0;
+    ring.setAttribute('stroke-dashoffset', (CIRC * (1 - p)).toFixed(2));
+
+    // stopwatch
+    const totalS = Math.floor(t / 1000);
+    setHTML(timeEl, `${mmss(totalS)}<span class="cs">.${pad(Math.floor(t / 10) % 100)}</span>`);
+
+    // status pill + tab title
+    let status, title;
+    if (!l) {
+      status = '익힘 정도를 골라주세요';
+      title = '말랑 에그 타이머';
+    } else if (done) {
+      status = `다 익었어요! +${mmss(Math.floor((t - target()) / 1000))}`;
+      title = '🥚 다 익었어요! · 말랑 에그 타이머';
+    } else {
+      const left = mmss(Math.ceil((target() - t) / 1000));
+      status = `목표 ${mmss(l.min * 60)} · ${left} 남음`;
+      title = `${running ? '⏳' : '⏸'} ${left} 남음 · ${l.name}`;
+    }
+    setText(statusEl, status);
+    if (document.title !== title) document.title = title;
+
+    // speech bubble
+    let msg;
+    if (flashText) msg = flashText;
+    else if (state === 'idle') msg = '물이 보글보글 끓으면 계란을 넣고 익힘 정도를 골라주세요!';
+    else if (state === 'running') msg = `${l.name} 만드는 중… ${l.desc} 🔥`;
+    else if (state === 'paused') msg = '잠깐 멈췄어요. ‘계속’을 누르면 다시 시작해요';
+    else msg = '다 익었어요! 찬물에 바로 담가주세요 🧊';
+    setText(msgEl, msg);
+
+    // controls
+    pauseBtn.disabled = !l;
+    resetBtn.disabled = !l;
+    setText(pauseBtn, l && !running ? '계속' : '멈춤');
+  }
+
+  function loop() { update(); requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+  setInterval(update, 500); // keeps the alarm firing when the tab is in the background
+
+  // ---------- sound ----------
+  let actx = null;
+  let soundOn = true;
+  try { soundOn = localStorage.getItem('egg-sound') !== 'off'; } catch {}
+  soundBtn.setAttribute('aria-pressed', String(soundOn));
+
+  function unlockAudio() {
+    try {
+      actx ||= new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+    } catch {}
+  }
+
+  function tone(freq, start, dur, vol = .22, type = 'triangle', toFreq) {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(freq, start);
+    if (toFreq) o.frequency.exponentialRampToValueAtTime(toFreq, start + dur);
+    g.gain.setValueAtTime(0, start);
+    g.gain.linearRampToValueAtTime(vol, start + .01);
+    g.gain.exponentialRampToValueAtTime(.001, start + dur);
+    o.connect(g).connect(actx.destination);
+    o.start(start);
+    o.stop(start + dur + .05);
+  }
+
+  function pop() {
+    if (!soundOn || !actx) return;
+    tone(520, actx.currentTime, .12, .15, 'sine', 900);
+  }
+
+  function chime() {
+    if (!soundOn || !actx) return;
+    const t0 = actx.currentTime + .05;
+    const notes = [1046.5, 1318.5, 1568, 2093];
+    for (let rep = 0; rep < 3; rep++)
+      notes.forEach((f, i) => tone(f, t0 + rep * 1.1 + i * .14, .5));
+  }
+
+  function onDone() {
+    chime();
+    navigator.vibrate?.([200, 100, 200, 100, 300]);
+  }
+
+  soundBtn.addEventListener('click', () => {
+    soundOn = !soundOn;
+    soundBtn.setAttribute('aria-pressed', String(soundOn));
+    try { localStorage.setItem('egg-sound', soundOn ? 'on' : 'off'); } catch {}
+    if (soundOn) { unlockAudio(); pop(); }
+  });
+
+  // ---------- controls ----------
+  pauseBtn.addEventListener('click', togglePause);
+  resetBtn.addEventListener('click', reset);
+
+  document.addEventListener('keydown', e => {
+    if (e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (e.code === 'Space') { e.preventDefault(); togglePause(); }
+    else if (e.code === 'KeyR') reset();
+    else if (/^Digit[1-5]$/.test(e.code)) selectLevel(Number(e.code.slice(5)) - 1);
+  });
+</script>
+</body>
+</html>
